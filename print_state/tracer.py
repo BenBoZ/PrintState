@@ -21,7 +21,7 @@ def traceit(frame, event, arg):
             filename.endswith(".pyo")):
             filename = filename[:-1]
         name = frame.f_globals["__name__"]
-        line = linecache.getline(filename, lineno)
+        line = linecache.getline(filename, lineno).strip()
 
         global __tracements__
         __tracements__ += ["State: {line_globals} {line_locals}".format(**locals())]
@@ -31,16 +31,22 @@ def traceit(frame, event, arg):
 
 #----- Wrapper
 from functools import wraps
-def trace_me(f):
-    @wraps(f)
-    def wrapped(*args, **kwargs):
-        sys.settrace(traceit)
-        result = f(*args, **kwargs)
-        sys.settrace(None)
-        print("\n".join(__tracements__))
-        return result
-    return wrapped
 
+def trace_me(tracefile='tracefile'):
+    def trace_decorator(func):
+        @wraps(func)
+        def wrapped(*args, **kwargs):
+            sys.settrace(traceit)
+            result = func(*args, **kwargs)
+            sys.settrace(None)
+
+            with open(tracefile, 'w') as output:
+                for tracement in __tracements__:
+                    output.write("{tracement}\n".format(**locals()))
+
+            return result
+        return wrapped
+    return trace_decorator
 
 if __name__ == "__main__":
     import doctest

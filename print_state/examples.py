@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from tracer import trace_me
 
-@trace_me
+@trace_me()
 def bubblesort(sortme):
     offset = 1
 
@@ -15,7 +15,8 @@ def bubblesort(sortme):
 
         if not swapped:
             return sortme
-@trace_me
+
+@trace_me(tracefile="my_file.txt")
 def find_max(num1, num2, num3):
 
     max_num = 0
