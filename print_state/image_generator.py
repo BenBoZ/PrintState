@@ -20,11 +20,13 @@ class MemoryField(object):
         >>> MemoryField(pos=(25,50), text='bla').to_svg()
         '<rect height="25" style="fill:#663;" width="25" x="25" y="50" />'
         '''
-        elem = ET.Element('rect', y=str(self.pos[1]), x=str(self.pos[0]),
+        return ET.tostring(self.to_svg_elem())
+
+    def to_svg_elem(self):
+        ''' Creates SVG element '''
+        return ET.Element('rect', y=str(self.pos[1]), x=str(self.pos[0]),
                           width=str(self.width), height=str(self.height),
                           style="fill:"+rgb_to_hex((100,100,50))+";")
-
-        return ET.tostring(elem)
 
 class ProgramState(object):
 
@@ -52,6 +54,11 @@ class ProgramState(object):
 
         return "\n".join(result)
 
+    def to_svg_elems(self):
+        ''' Writes SVG elements '''
+
+        return [field.to_svg_elem() for _, field in self.fields.iteritems()]
+
 class SVGdrawing(object):
 
     height= 500
@@ -70,9 +77,24 @@ class SVGdrawing(object):
         drawing = ET.SubElement(svg_root, 'g', style="fill-opacity:1.0; stroke:black;")
 
         for child in self.children:
-            drawing.append(child)
+            for children in child.to_svg_elems():
+                drawing.append(children)
 
         return ET.tostring(svg_root)
+
+import csv
+def create_image(path):
+
+    with open(path) as csvfile:
+        reader = csv.DictReader(csvfile)
+
+        drawing = SVGdrawing()
+        offset = 20
+        for idx, row in enumerate(reader):
+            drawing.children += [ProgramState([offset, offset*idx], row)]
+
+        print(drawing.to_svg())
+
 
 if __name__ == "__main__":
     import doctest

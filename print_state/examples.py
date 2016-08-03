@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from tracer import trace_me
+from image_generator import create_image
 
 @trace_me()
 def bubblesort(sortme):
@@ -33,5 +34,6 @@ def find_max(num1, num2, num3):
     return max_num
 
 if __name__ == "__main__":
-    bubblesort([3,2,1])
     find_max(3,2,1)
+
+    create_image("my_file.txt")
