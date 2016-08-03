@@ -2,7 +2,7 @@
 
 import sys
 import linecache
-from types import ModuleType, FunctionType, ClassType, TypeType
+from types import ModuleType, FunctionType
 
 __tracements__ = []
 
@@ -12,8 +12,7 @@ def traceit(frame, event, arg):
         line_globals = {k:v for k,v in frame.f_globals.items() if not (k.startswith('__')
                                                                        or isinstance(v, ModuleType)
                                                                        or isinstance(v, FunctionType)
-                                                                       or isinstance(v, ClassType)
-                                                                       or isinstance(v, TypeType)
+                                                                       or isinstance(v, type)
                                                                        or k.endswith('Type'))}
         line_locals = {k:v for k,v in frame.f_locals.items() if not k.startswith('__')}
         lineno = frame.f_lineno
@@ -38,7 +37,7 @@ def trace_me(f):
         sys.settrace(traceit)
         result = f(*args, **kwargs)
         sys.settrace(None)
-        print "\n".join(__tracements__)
+        print("\n".join(__tracements__))
         return result
     return wrapped
 
