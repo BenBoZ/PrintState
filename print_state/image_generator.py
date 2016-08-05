@@ -29,6 +29,41 @@ class MemoryField(object):
                           style="fill:"+rgb_to_hex((140,225,0))+";")
         return elem
 
+class Transformation(object):
+
+    arrowhead_define = ET.Element('marker', id='arrowhead',
+                            orient='auto',
+                            markerWidth='2',
+                            markerHeight='4',
+                            refX='0.1', refY='2')
+    arrowhead_shape = ET.SubElement(arrowhead_define, 'path', d='M0,0 V4 L2,2 Z', fill='black')
+
+    def __init__(self, pos, statement):
+        self.pos = pos
+        self.statement = statement
+
+    @classmethod
+    def defines(cls):
+        return cls.arrowhead_define
+
+    def to_svg_elems(self):
+
+
+        start_line = '0,15'
+        end_line = '-10,50'
+        start_line_dir = '-50,15'
+        end_line_dir = '-50,50'
+       
+        line_elem = ET.Element('path', **{'marker-end':'url(#arrowhead)',
+                                'stroke-width':'5',
+                                'fill':'none',
+                                'stroke':'black',
+                                'd':'M'+start_line+' C'+start_line_dir+' '+end_line_dir+' '+end_line})
+
+
+
+        return line_elem
+
 class ProgramState(object):
 
 
@@ -74,7 +109,12 @@ class SVGdrawing(object):
         svg_root = ET.Element('svg',
                        height=str(self.height),
                       width=str(self.width))
+        defines = ET.SubElement(svg_root, 'defs')
+
+        defines.append(Transformation.defines())
         drawing = ET.SubElement(svg_root, 'g', style="fill-opacity:1.0; stroke:black;")
+
+        drawing.append(Transformation([30,30], 'bla').to_svg_elems())
 
         for child in self.children:
             for children in child.to_svg_elems():
