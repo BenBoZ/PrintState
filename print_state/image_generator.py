@@ -31,10 +31,13 @@ class MemoryField(object):
 
 class Transformation(object):
 
+    height = int(MemoryField.height * 0.8)
+    width  = 50
+
     arrowhead_define = ET.Element('marker', id='arrowhead',
                             orient='auto',
-                            markerWidth='2',
-                            markerHeight='4',
+                            markerWidth='1',
+                            markerHeight='2',
                             refX='0.1', refY='2')
     arrowhead_shape = ET.SubElement(arrowhead_define, 'path', d='M0,0 V4 L2,2 Z', fill='black')
 
@@ -48,19 +51,15 @@ class Transformation(object):
 
     def to_svg_elems(self):
 
+        x1, x2 = self.pos[0], self.pos[0]-self.width
+        x3     = self.pos[0]-10
+        y1, y2 = self.pos[1], self.pos[1]+self.height
 
-        start_line = '0,15'
-        end_line = '-10,50'
-        start_line_dir = '-50,15'
-        end_line_dir = '-50,50'
-       
         line_elem = ET.Element('path', **{'marker-end':'url(#arrowhead)',
                                 'stroke-width':'5',
                                 'fill':'none',
                                 'stroke':'black',
-                                'd':'M'+start_line+' C'+start_line_dir+' '+end_line_dir+' '+end_line})
-
-
+                                'd':'M{x1},{y1} C{x2},{y1} {x2},{y2} {x3},{y2}'.format(**locals())})
 
         return line_elem
 
@@ -71,6 +70,7 @@ class ProgramState(object):
         self.fields = {}
 
         self.pos = pos
+        self.transformation = Transformation((pos[0] , pos[1] + MemoryField.height/2 * 1.1), fields['line'])
 
         for idx, field in enumerate(fields.keys()):
 
@@ -92,7 +92,7 @@ class ProgramState(object):
     def to_svg_elems(self):
         ''' Writes SVG elements '''
 
-        return [field.to_svg_elem() for _, field in self.fields.iteritems()]
+        return [field.to_svg_elem() for _, field in self.fields.iteritems()] + [self.transformation.to_svg_elems()]
 
 class SVGdrawing(object):
 
@@ -113,8 +113,6 @@ class SVGdrawing(object):
 
         defines.append(Transformation.defines())
         drawing = ET.SubElement(svg_root, 'g', style="fill-opacity:1.0; stroke:black;")
-
-        drawing.append(Transformation([30,30], 'bla').to_svg_elems())
 
         for child in self.children:
             for children in child.to_svg_elems():
