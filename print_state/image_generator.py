@@ -18,33 +18,33 @@ class MemoryField(object):
     def to_svg(self):
         ''' Writes SVG element
         >>> MemoryField(pos=(25,50), text='bla').to_svg()
-        '<rect height="25" style="fill:#663;" width="25" x="25" y="50" />'
+        '<rect height="25" style="fill:#8e0;" width="25" x="25" y="50" />'
         '''
         return ET.tostring(self.to_svg_elem())
 
     def to_svg_elem(self):
         ''' Creates SVG element '''
-        return ET.Element('rect', y=str(self.pos[1]), x=str(self.pos[0]),
+        elem = ET.Element('rect', y=str(self.pos[1]), x=str(self.pos[0]),
                           width=str(self.width), height=str(self.height),
-                          style="fill:"+rgb_to_hex((100,100,50))+";")
+                          style="fill:"+rgb_to_hex((140,225,0))+";")
+        return elem
 
 class ProgramState(object):
 
-    fields = {}
 
     def __init__(self, pos, fields):
+        self.fields = {}
 
         self.pos = pos
 
         for idx, field in enumerate(fields.keys()):
 
-            pos[0] = pos[0] + (MemoryField.margin + MemoryField.width) * idx
-            self.fields[field] = MemoryField(pos[:], fields[field])
+            self.fields[field] = MemoryField((pos[0] + (MemoryField.margin + MemoryField.width) * idx, pos[1]), fields[field])
 
     def to_svg(self):
         ''' Writes SVG elements
-        >>> ProgramState([10,20], {'a':12, 'b':13}).to_svg()
-        '<rect height="25" style="fill:#663;" width="25" x="10" y="20" />\\n<rect height="25" style="fill:#663;" width="25" x="40" y="20" />'
+        >>> ProgramState([10,20], {'a':12, 'b':13, 'c':14}).to_svg()
+        '<rect height="25" style="fill:#8e0;" width="25" x="10" y="20" />\\n<rect height="25" style="fill:#8e0;" width="25" x="40" y="20" />\\n<rect height="25" style="fill:#8e0;" width="25" x="70" y="20" />'
         '''
 
         result  = []
@@ -89,11 +89,16 @@ def create_image(path):
         reader = csv.DictReader(csvfile)
 
         drawing = SVGdrawing()
-        offset = 20
-        for idx, row in enumerate(reader):
-            drawing.children += [ProgramState([offset, offset*idx], row)]
+        offset = MemoryField.height + MemoryField.margin
 
-        print(drawing.to_svg())
+        for idx, row in enumerate(reader):
+            drawing.children += [ProgramState((MemoryField.margin, offset*idx + MemoryField.margin), row)]
+
+        drawing.height = len(drawing.children) * offset + MemoryField.margin
+        drawing.width = len(drawing.children[-1].fields) * (MemoryField.width + MemoryField.margin) + MemoryField.margin
+
+        with open(path+'.svg','w') as svgfile:
+            svgfile.write(drawing.to_svg())
 
 
 if __name__ == "__main__":

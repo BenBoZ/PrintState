@@ -17,7 +17,8 @@ def bubblesort(sortme):
         if not swapped:
             return sortme
 
-@trace_me(tracefile="my_file.txt")
+TRACE_NAME="find_max.trace"
+@trace_me(tracefile=TRACE_NAME)
 def find_max(num1, num2, num3):
 
     max_num = 0
@@ -36,4 +37,4 @@ def find_max(num1, num2, num3):
 if __name__ == "__main__":
     find_max(3,2,1)
 
-    create_image("my_file.txt")
+    create_image(TRACE_NAME)
