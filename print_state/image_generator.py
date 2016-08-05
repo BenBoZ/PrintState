@@ -51,17 +51,22 @@ class Transformation(object):
 
     def to_svg_elems(self):
 
+        group = ET.Element('g')
+
         x1, x2 = self.pos[0], self.pos[0]-self.width
         x3     = self.pos[0]-10
         y1, y2 = self.pos[1], self.pos[1]+self.height
 
-        line_elem = ET.Element('path', **{'marker-end':'url(#arrowhead)',
+        line_elem = ET.SubElement(group, 'path', **{'marker-end':'url(#arrowhead)',
                                 'stroke-width':'5',
                                 'fill':'none',
                                 'stroke':'black',
                                 'd':'M{x1},{y1} C{x2},{y1} {x2},{y2} {x3},{y2}'.format(**locals())})
 
-        return line_elem
+        text_elem = ET.SubElement(group, 'text', x=str(x1-self.width), y=str(y1))
+        text_elem.text = self.statement
+
+        return group
 
 class ProgramState(object):
 
