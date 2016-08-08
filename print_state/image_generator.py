@@ -43,7 +43,7 @@ class Transformation(object):
 
     def __init__(self, pos, statement):
         self.pos = pos
-        self.statement = statement
+        self.statement = statement.strip()
 
     @classmethod
     def defines(cls):
@@ -63,7 +63,9 @@ class Transformation(object):
                                 'stroke':'black',
                                 'd':'M{x1},{y1} C{x2},{y1} {x2},{y2} {x3},{y2}'.format(**locals())})
 
-        text_elem = ET.SubElement(group, 'text', x=str(x1-self.width), y=str(y1))
+        width_of_text = len(self.statement) * 6
+        text_elem = ET.SubElement(group, 'text', x=str(x2-width_of_text), y=str(y1 + self.height/2),
+                                  style="font-family:monospace;font-size:10px;")
         text_elem.text = self.statement
 
         return group
