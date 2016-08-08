@@ -70,14 +70,37 @@ class Transformation(object):
 
         return group
 
-class ProgramState(object):
+class ProgramStateHeader(object):
 
 
     def __init__(self, pos, fields):
+        self.fields = fields
+        self.pos = pos
+
+    def to_svg_elems(self):
+
+        group = ET.Element('g')
+
+        for idx, field in enumerate(self.fields):
+
+            y = self.pos[0] + (MemoryField.margin + 1 * MemoryField.width) * idx + MemoryField.width / 2
+            x = self.pos[1] + 2* MemoryField.height
+            text_elem = ET.SubElement(group, 'text', x=str(x), y=str(y),
+                                      style="font-family:monospace;font-size:10px;",
+                                      transform="rotate(-90)")
+            text_elem.text = field
+
+        return group
+
+
+class ProgramState(object):
+
+
+    def __init__(self, pos, fields, statement):
         self.fields = {}
 
         self.pos = pos
-        self.transformation = Transformation((pos[0] , pos[1] + MemoryField.height/2 * 1.1), fields['line'])
+        self.transformation = Transformation((pos[0] , pos[1] + MemoryField.height/2 * 1.1), statement)
 
         for idx, field in enumerate(fields.keys()):
 
@@ -136,8 +159,17 @@ def create_image(path):
         drawing = SVGdrawing()
         offset = MemoryField.height + MemoryField.margin
 
+
         for idx, row in enumerate(reader):
-            drawing.children += [ProgramState((MemoryField.margin, offset*idx + MemoryField.margin), row)]
+
+            statement = row.pop('line')
+
+            if idx == 0:
+                drawing.children = [ProgramStateHeader((MemoryField.margin, -40), row.keys())]
+
+            drawing.children += [ProgramState((MemoryField.margin, offset*idx + MemoryField.margin), row, statement)]
+
+                
 
         drawing.height = len(drawing.children) * offset + MemoryField.margin
         drawing.width = len(drawing.children[-1].fields) * (MemoryField.width + MemoryField.margin) + MemoryField.margin
