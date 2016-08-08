@@ -2,6 +2,8 @@
 
 import xml.etree.cElementTree as ET
 import doctest
+import ast
+import code
 
 def rgb_to_hex(rgb): return "#%x%x%x" % (rgb[0]/16,rgb[1]/16,rgb[2]/16)
 
@@ -49,6 +51,7 @@ class Transformation(object):
     def __init__(self, pos, statement):
         self.pos = pos
         self.statement = statement.strip()
+
 
     @classmethod
     def defines(cls):
@@ -98,8 +101,17 @@ class ProgramStateHeader(object):
         return group
 
 
-class ProgramState(object):
+class AssignmentFinder(ast.NodeVisitor):
 
+    def visit_Assign(self, node):
+
+        for target in node.targets:
+            try:
+                print target.id
+            except AttributeError:
+                ast.dump(node)
+
+class ProgramState(object):
 
     def __init__(self, pos, fields, line_no, statement):
         self.fields = []
@@ -107,10 +119,28 @@ class ProgramState(object):
         self.pos = pos
         self.transformation = Transformation((pos[0] , pos[1] + MemoryField.height/2 * 1.1), statement)
         self.fields.append(MemoryField(pos[:], line_no))
-
+        self.parse_statement(statement)
         for idx, (field_name, field_value) in enumerate(fields.iteritems(), 1):
             mem_field = MemoryField((pos[0] + (MemoryField.margin + MemoryField.width) * idx, pos[1]), field_value)
             self.fields.append(mem_field)
+
+    def parse_statement(self, statement):
+
+
+        # See if it is valid python
+        try:
+            if not code.compile_command(statement):
+                statement += ' pass'
+
+            tree = ast.parse(statement)
+
+            AssignmentFinder().visit(tree)
+#            for k,v in ast.iter_fields(tree['body']):
+#                print "{k}:{v}".format(**locals())
+
+        except SyntaxError:
+            print( "Parsing %s failed" % statement)
+
 
     def to_svg(self):
         ''' Writes SVG elements
