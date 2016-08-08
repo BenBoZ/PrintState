@@ -7,7 +7,7 @@ def rgb_to_hex(rgb): return "#%x%x%x" % (rgb[0]/16,rgb[1]/16,rgb[2]/16)
 
 class MemoryField(object):
 
-    width = 25
+    width = 75
     height = 25
     margin = 5
 
@@ -24,10 +24,15 @@ class MemoryField(object):
 
     def to_svg_elem(self):
         ''' Creates SVG element '''
-        elem = ET.Element('rect', y=str(self.pos[1]), x=str(self.pos[0]),
+        group = ET.Element('g')
+        elem = ET.SubElement(group, 'rect', y=str(self.pos[1]), x=str(self.pos[0]),
                           width=str(self.width), height=str(self.height),
                           style="fill:"+rgb_to_hex((140,225,0))+";")
-        return elem
+
+        text_elem = ET.SubElement(group, 'text', x=str(self.pos[0]+self.width/2), y=str(self.pos[1] + 5 + self.height/2),
+                                  style="font-family:monospace;font-size:10px;text-anchor:middle;")
+        text_elem.text = self.text
+        return group
 
 class Transformation(object):
 
