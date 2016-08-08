@@ -4,6 +4,7 @@ import sys
 import linecache
 from types import ModuleType, FunctionType
 import csv
+from copy import deepcopy
 
 __tracements__ = []
 
@@ -25,8 +26,7 @@ def traceit(frame, event, arg):
         line = linecache.getline(filename, lineno).strip()
 
         global __tracements__
-        __tracements__ += [dict(line_globals.items() + line_locals.items() + {'lineno':lineno, 'line':line}.items())]
-
+        __tracements__ += [deepcopy(dict(line_globals.items() + line_locals.items() + {'lineno':lineno, 'line':line}.items()))]
     return traceit
 
 #----- Wrapper
