@@ -81,7 +81,7 @@ class ProgramStateHeader(object):
 
         group = ET.Element('g')
 
-        for idx, field in enumerate(self.fields):
+        for idx, field in enumerate(['line number'] + self.fields):
 
             y = self.pos[0] + (MemoryField.margin + 1 * MemoryField.width) * idx + MemoryField.width / 2
             x = self.pos[1] + 2* MemoryField.height
@@ -96,15 +96,16 @@ class ProgramStateHeader(object):
 class ProgramState(object):
 
 
-    def __init__(self, pos, fields, statement):
-        self.fields = {}
+    def __init__(self, pos, fields, line_no, statement):
+        self.fields = []
 
         self.pos = pos
         self.transformation = Transformation((pos[0] , pos[1] + MemoryField.height/2 * 1.1), statement)
+        self.fields.append(MemoryField(pos[:], line_no))
 
-        for idx, field in enumerate(fields.keys()):
-
-            self.fields[field] = MemoryField((pos[0] + (MemoryField.margin + MemoryField.width) * idx, pos[1]), fields[field])
+        for idx, (field_name, field_value) in enumerate(fields.iteritems(), 1):
+            mem_field = MemoryField((pos[0] + (MemoryField.margin + MemoryField.width) * idx, pos[1]), field_value)
+            self.fields.append(mem_field)
 
     def to_svg(self):
         ''' Writes SVG elements
@@ -114,7 +115,7 @@ class ProgramState(object):
 
         result  = []
 
-        for fieldname, field in self.fields.items():
+        for field in self.fields:
             result.append(field.to_svg())
 
         return "\n".join(result)
@@ -122,7 +123,7 @@ class ProgramState(object):
     def to_svg_elems(self):
         ''' Writes SVG elements '''
 
-        return [field.to_svg_elem() for _, field in self.fields.iteritems()] + [self.transformation.to_svg_elems()]
+        return [field.to_svg_elem() for field in self.fields] + [self.transformation.to_svg_elems()]
 
 class SVGdrawing(object):
 
@@ -163,11 +164,12 @@ def create_image(path):
         for idx, row in enumerate(reader):
 
             statement = row.pop('line')
+            line_no = row.pop('lineno')
 
             if idx == 0:
                 drawing.children = [ProgramStateHeader((MemoryField.margin, -40), row.keys())]
 
-            drawing.children += [ProgramState((MemoryField.margin, offset*idx + MemoryField.margin), row, statement)]
+            drawing.children += [ProgramState((MemoryField.margin, offset*idx + MemoryField.margin), row, line_no, statement)]
 
                 
 
