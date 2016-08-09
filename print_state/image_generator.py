@@ -7,7 +7,8 @@ import code
 from copy import deepcopy
 
 def rgb_to_hex(rgb): return "#%x%x%x" % (rgb[0]/16,rgb[1]/16,rgb[2]/16)
-
+PURPLE="rgb(210,0,159)"
+GREEN="rgb(159,210,0)"
 
 class MemoryField(object):
 
@@ -22,6 +23,7 @@ class MemoryField(object):
     def __init__(self, pos, text ):
         self.text = text
         self.pos = pos
+        self.is_input = False
 
     @classmethod
     def defines(cls):
@@ -37,56 +39,21 @@ class MemoryField(object):
     def to_svg_elem(self):
         ''' Creates SVG element '''
         group = ET.Element('g')
+
+        if self.is_input:
+            color = PURPLE
+        else:
+            color = GREEN
+
         elem = ET.SubElement(group, 'rect', y=str(self.pos[1]), x=str(self.pos[0]),
                           width=str(self.width), height=str(self.height),
-                          style="fill:url(#grad_green);stroke:rgb(159,210,0)")
+                          style="fill:url(#grad_green)", stroke=color)
 
         text_elem = ET.SubElement(group, 'text', x=str(self.pos[0]+self.width/2), y=str(self.pos[1] + 5 + self.height/2),
                                   style="font-family:monospace;font-size:10px;text-anchor:middle;")
         text_elem.text = self.text
         return group
 
-class Transformation(object):
-
-    height = int(MemoryField.height * 0.8)
-    width  = 50
-
-    arrowhead_define = ET.Element('marker', id='arrowhead',
-                            orient='auto',
-                            markerWidth='1',
-                            markerHeight='2',
-                            refX='0.1', refY='2')
-    arrowhead_shape = ET.SubElement(arrowhead_define, 'path', d='M0,0 V4 L2,2 Z', fill='black')
-
-    def __init__(self, pos, statement):
-        self.pos = pos
-        self.statement = statement.strip()
-
-
-    @classmethod
-    def defines(cls):
-        return cls.arrowhead_define
-
-    def to_svg_elems(self):
-
-        group = ET.Element('g')
-
-        x1, x2 = self.pos[0], self.pos[0]-self.width
-        x3     = self.pos[0]-10
-        y1, y2 = self.pos[1], self.pos[1]+self.height
-
-        line_elem = ET.SubElement(group, 'path', **{'marker-end':'url(#arrowhead)',
-                                'stroke-width':'3',
-                                'fill':'none',
-                                'stroke':'black',
-                                'd':'M{x1},{y1} C{x2},{y1} {x2},{y2} {x3},{y2}'.format(**locals())})
-
-        width_of_text = len(self.statement) * 6
-        text_elem = ET.SubElement(group, 'text', x=str(x2-width_of_text), y=str(y1 + self.height/2),
-                                  style="font-family:monospace;font-size:10px;")
-        text_elem.text = self.statement
-
-        return group
 
 class ProgramStateHeader(object):
 
@@ -235,6 +202,8 @@ class IOFinder(ast.NodeVisitor):
 
 class ProgramState(object):
 
+    margin = 4 * MemoryField.margin
+
     def __init__(self, pos, fields, line_no, statement):
         self.fields = []
 
@@ -243,9 +212,18 @@ class ProgramState(object):
         self.fields.append(MemoryField(pos[:], line_no))
         (inputs, outputs) = self.parse_statement(statement)
 
+        positions = {'line_number':self.fields[0].pos}
         for idx, (field_name, field_value) in enumerate(fields.items(), 1):
             mem_field = MemoryField((pos[0] + (MemoryField.margin + MemoryField.width) * idx, pos[1]), field_value)
             self.fields.append(mem_field)
+            positions[field_name] = mem_field.pos
+            if field_name in inputs:
+                mem_field.is_input = True
+
+        for input_field in inputs:
+            for output_field in outputs:
+                arrow = Effect((positions[input_field][0] + mem_field.width/2, positions[input_field][1] + mem_field.height), (positions[output_field][0] + mem_field.width/2, positions[output_field][1] +mem_field.height + 0.75 * ProgramState.margin))
+                self.fields.append(arrow)
 
     def parse_statement(self, statement):
 
@@ -324,6 +302,68 @@ class SVGdrawing(object):
 
         return ET.tostring(svg_root)
 
+class Arrow(object):
+
+
+    arrowhead_define = ET.Element('marker', id='arrowhead',
+                            orient='auto',
+                            markerWidth='1',
+                            markerHeight='2',
+                            refX='0.1', refY='2')
+    arrowhead_shape = ET.SubElement(arrowhead_define, 'path', d='M0,0 V4 L2,2 Z', fill='black')
+
+    @classmethod
+    def defines(cls):
+        return cls.arrowhead_define
+
+class Transformation(Arrow):
+
+    height = int(ProgramState.margin + 3 * MemoryField.margin)
+    width  = 50
+
+    def __init__(self, pos, statement):
+        self.pos = pos
+        self.statement = statement.strip()
+
+    def to_svg_elems(self):
+
+        group = ET.Element('g')
+
+        x1, x2 = self.pos[0], self.pos[0]-self.width
+        x3     = self.pos[0]-10
+        y1, y2 = self.pos[1], self.pos[1]+self.height
+
+        line_elem = ET.SubElement(group, 'path', **{'marker-end':'url(#arrowhead)',
+                                'stroke-width':'3',
+                                'fill':'none',
+                                'stroke':'black',
+                                'd':'M{x1},{y1} C{x2},{y1} {x2},{y2} {x3},{y2}'.format(**locals())})
+
+        width_of_text = len(self.statement) * 6
+        text_elem = ET.SubElement(group, 'text', x=str(x2-width_of_text), y=str(y1 + self.height/2),
+                                  style="font-family:monospace;font-size:10px;")
+        text_elem.text = self.statement
+
+        return group
+
+class Effect(Arrow):
+    def __init__(self, from_pos, to_pos):
+        self.from_pos = from_pos
+        self.to_pos = to_pos
+
+    def to_svg_elem(self):
+
+        x1, x2 = self.from_pos[0], self.to_pos[0]
+        y1, y2 = self.from_pos[1], self.to_pos[1]
+
+        line_elem = ET.Element('path', **{'marker-end':'url(#arrowhead)',
+                               'stroke-width':'3',
+                               'fill':'none',
+                               'stroke':PURPLE,
+                               'd':'M{x1},{y1} C{x1},{y2} {x2},{y1} {x2},{y2}'.format(**locals())})
+
+        return line_elem
+
 import csv
 def create_image(path):
 
@@ -331,7 +371,7 @@ def create_image(path):
         reader = csv.DictReader(csvfile)
 
         drawing = SVGdrawing()
-        offset = MemoryField.height + MemoryField.margin
+        offset = MemoryField.height + ProgramState.margin
 
 
         for idx, row in enumerate(reader):
