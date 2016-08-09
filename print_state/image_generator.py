@@ -180,9 +180,17 @@ class SVGdrawing(object):
         defines.append(Transformation.defines())
         drawing = ET.SubElement(svg_root, 'g', style="fill-opacity:1.0; stroke:black;")
 
+
+        min_coordinates = [0, 0]
         for child in self.children:
             for children in child.to_svg_elems():
                 drawing.append(children)
+                for node in children.findall(".//*[@x]"):
+                    min_coordinates[0] = min(int(round(float(node.get('x')))), min_coordinates[0])
+                    min_coordinates[1] = min(int(round(float(node.get('y')))), min_coordinates[1])
+
+        svg_root.set('width', str(abs(min_coordinates[0]) + self.width))
+        svg_root.set('height', str(abs(min_coordinates[1]) + self.height))
 
         return ET.tostring(svg_root)
 
