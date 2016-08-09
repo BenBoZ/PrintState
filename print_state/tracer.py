@@ -26,7 +26,11 @@ def traceit(frame, event, arg):
         line = linecache.getline(filename, lineno).strip()
 
         global __tracements__
-        __tracements__ += [deepcopy(dict(line_globals.items() + line_locals.items() + {'lineno':lineno, 'line':line}.items()))]
+        line_dict = dict(line_globals)
+        for d in [line_locals, {'lineno':lineno, 'line':line}]:
+            line_dict.update(d)
+
+        __tracements__ += [deepcopy(line_dict)]
     return traceit
 
 #----- Wrapper
