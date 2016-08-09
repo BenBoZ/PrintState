@@ -7,15 +7,24 @@ import code
 
 def rgb_to_hex(rgb): return "#%x%x%x" % (rgb[0]/16,rgb[1]/16,rgb[2]/16)
 
+
 class MemoryField(object):
 
     width = 75
     height = 25
     margin = 5
 
+    grad_green = ET.Element('linearGradient', id="grad_green", x1="0%", y1="0%", x2="0%", y2="100%")
+    _stop1 = ET.SubElement(grad_green, 'stop', offset="0%", style="stop-color:rgb(224,255,129);stop-opacity:1")
+    _stop2 = ET.SubElement(grad_green, 'stop', offset="100%", style="stop-color:rgb(176,242,0);stop-opacity:1")
+
     def __init__(self, pos, text ):
         self.text = text
         self.pos = pos
+
+    @classmethod
+    def defines(cls):
+        return  cls.grad_green
 
     def to_svg(self):
         ''' Writes SVG element
@@ -29,7 +38,7 @@ class MemoryField(object):
         group = ET.Element('g')
         elem = ET.SubElement(group, 'rect', y=str(self.pos[1]), x=str(self.pos[0]),
                           width=str(self.width), height=str(self.height),
-                          style="fill:"+rgb_to_hex((140,225,0))+";")
+                          style="fill:url(#grad_green);stroke:rgb(159,210,0)")
 
         text_elem = ET.SubElement(group, 'text', x=str(self.pos[0]+self.width/2), y=str(self.pos[1] + 5 + self.height/2),
                                   style="font-family:monospace;font-size:10px;text-anchor:middle;")
@@ -178,6 +187,7 @@ class SVGdrawing(object):
         defines = ET.SubElement(svg_root, 'defs')
 
         defines.append(Transformation.defines())
+        defines.append(MemoryField.defines())
         drawing = ET.SubElement(svg_root, 'g', style="fill-opacity:1.0; stroke:black;")
 
 
