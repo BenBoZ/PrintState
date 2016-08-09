@@ -4,8 +4,10 @@ import xml.etree.cElementTree as ET
 import doctest
 import ast
 import code
+from copy import deepcopy
 
 def rgb_to_hex(rgb): return "#%x%x%x" % (rgb[0]/16,rgb[1]/16,rgb[2]/16)
+
 
 class MemoryField(object):
 
@@ -13,9 +15,17 @@ class MemoryField(object):
     height = 25
     margin = 5
 
+    grad_green = ET.Element('linearGradient', id="grad_green", x1="0%", y1="0%", x2="0%", y2="100%")
+    _stop1 = ET.SubElement(grad_green, 'stop', offset="0%", style="stop-color:rgb(224,255,129);stop-opacity:1")
+    _stop2 = ET.SubElement(grad_green, 'stop', offset="100%", style="stop-color:rgb(176,242,0);stop-opacity:1")
+
     def __init__(self, pos, text ):
         self.text = text
         self.pos = pos
+
+    @classmethod
+    def defines(cls):
+        return  cls.grad_green
 
     def to_svg(self):
         ''' Writes SVG element
@@ -29,7 +39,7 @@ class MemoryField(object):
         group = ET.Element('g')
         elem = ET.SubElement(group, 'rect', y=str(self.pos[1]), x=str(self.pos[0]),
                           width=str(self.width), height=str(self.height),
-                          style="fill:"+rgb_to_hex((140,225,0))+";")
+                          style="fill:url(#grad_green);stroke:rgb(159,210,0)")
 
         text_elem = ET.SubElement(group, 'text', x=str(self.pos[0]+self.width/2), y=str(self.pos[1] + 5 + self.height/2),
                                   style="font-family:monospace;font-size:10px;text-anchor:middle;")
@@ -89,7 +99,7 @@ class ProgramStateHeader(object):
 
         group = ET.Element('g')
 
-        for idx, field in enumerate(['line number'] + self.fields):
+        for idx, field in enumerate(['line number'] + list(self.fields)):
 
             y = self.pos[0] + (MemoryField.margin + 1 * MemoryField.width) * idx + MemoryField.width / 2
             x = self.pos[1] + 2* MemoryField.height
@@ -101,15 +111,161 @@ class ProgramStateHeader(object):
         return group
 
 
-class AssignmentFinder(ast.NodeVisitor):
+class IOFinder(ast.NodeVisitor):
+
+    def __init__(self):
+        super(IOFinder,self).__init__()
+        self.inputs = []
+        self.outputs = []
+
+        self._input_mode = False
+        self._output_mode = False
+
+    def make_unique(self):
+
+        self.inputs = list(set(self.inputs))
+        self.outputs = list(set(self.outputs))
+
+    def visit_comprehension(self, node):
+
+        self._input_mode = True
+        self.visit(node.iter)
+        self.visit(node.ifs)
+        self._input_mode = False
+        
+        self._output_mode = True
+        self.visit(node.target)
+        self._output_mode = True
+
+    def visit_Expr(self, node):
+
+        self._input_mode = True
+        self.generic_visit(node)
+        self._input_mode = False
 
     def visit_Assign(self, node):
 
+        self._output_mode = True
+
         for target in node.targets:
-            try:
-                print target.id
-            except AttributeError:
-                ast.dump(node)
+            self.visit(target)
+        self._output_mode = False
+
+        self._input_mode = True
+        self.visit(node.value)
+        self._input_mode = False
+
+    def visit_AugAssign(self, node):
+        self._output_mode = True
+
+        self.visit(node.target)
+        self._output_mode = False
+
+        self._input_mode = True
+        self.visit(node.value)
+        self._input_mode = False
+
+    def visit_BinOp(self, node):
+        self._input_mode = True
+        self.visit(node.right)
+        self.visit(node.left)
+        self._input_mode = False
+
+    def visit_UnaryOp(self, node):
+        self._input_mode = True
+        self.visit(node.operand)
+        self._input_mode = False
+
+    def visit_BoolOp(self, node):
+        self._input_mode = True
+        for value in node.values: self.visit(value)
+        self._input_mode = False
+
+    def visit_Name(self, node):
+
+        if self._input_mode and node.id not in ['True','False']:
+            self.inputs += [node.id]
+        if self._output_mode:
+            self.outputs += [node.id]
+
+    def visit_Subscript(self, node):
+
+        self.visit(node.value)
+
+        old_output_mode = deepcopy(self._output_mode)
+        old_input_mode = deepcopy(self._input_mode)
+        self._output_mode = False
+        self._input_mode = True
+        self.visit(node.slice)
+        self._output_mode = old_output_mode
+        self._input_mode = old_input_mode
+
+    def visit_Compare(self, node):
+
+        self._input_mode = True
+        for child in [node.left] + node.comparators:
+            self.visit(child)
+        self._input_mode = False
+
+    def visit_Call(self, node):
+
+        self._input_mode = True
+
+        for child in node.args + node.keywords + [node.starargs] + [node.kwargs]:
+            if child:
+                self.visit(child)
+        self._input_mode = False
+
+    def _control_flow(self,node):
+        self.outputs += ['line_number'] 
+        self.generic_visit(node)
+
+    def visit_If(self, node):
+
+        self._input_mode = True
+        self.visit(node.test)
+        self._input_mode= False
+        for child in node.orelse: self.visit(child)
+        self.outputs += ['line_number'] 
+
+    def visit_For(self, node):
+
+        self._output_mode = True
+        self.visit(node.target)
+        self._output_mode = False
+
+        self._input_mode = True
+        self.visit(node.iter)
+        self._input_mode = False
+
+        for child in node.orelse: self.visit(child)
+        self.outputs += ['line_number'] 
+
+    def visit_While(self, node):
+        self._input_mode = True
+        self.visit(node.test)
+        self._input_mode = False
+
+        for child in node.orelse: self.visit(child)
+        self.outputs += ['line_number'] 
+
+    def visit_Break(self, node):
+        self._control_flow(node)
+
+    def visit_Try(self, node):
+        self._control_flow(node)
+
+    def visit_TryFinally(self, node):
+        self._control_flow(node)
+
+    def visit_ExceptHandler(self, node):
+        self._control_flow(node)
+
+    def visit_With(self, node):
+        self._control_flow(node)
+
+    def visit_withitem(self, node):
+        self._control_flow(node)
 
 class ProgramState(object):
 
@@ -119,28 +275,39 @@ class ProgramState(object):
         self.pos = pos
         self.transformation = Transformation((pos[0] , pos[1] + MemoryField.height/2 * 1.1), statement)
         self.fields.append(MemoryField(pos[:], line_no))
-        self.parse_statement(statement)
-        for idx, (field_name, field_value) in enumerate(fields.iteritems(), 1):
+        print(line_no + ":" + statement)
+        (inputs, outputs) = self.parse_statement(statement)
+
+        print("\tinputs: " + " ".join([str(name) for name in inputs]))
+        print("\toutputs: " + " ".join([str(name) for name in outputs]))
+
+        for idx, (field_name, field_value) in enumerate(fields.items(), 1):
             mem_field = MemoryField((pos[0] + (MemoryField.margin + MemoryField.width) * idx, pos[1]), field_value)
             self.fields.append(mem_field)
 
     def parse_statement(self, statement):
 
-
         # See if it is valid python
         try:
             if not code.compile_command(statement):
-                statement += ' pass'
+                statement = statement + ' pass'
+        except SyntaxError as e:
+            try:
+                statement = 'if True: pass\n' + statement
+                if not code.compile_command(statement):
+                    statement = statement + ' pass'
+            except SyntaxError as e:
+                print( "Parsing %s failed" % statement)
+                statement = ""
+ 
+        tree = ast.parse(statement)
+ 
+        io = IOFinder()
+        io.visit(tree)
+        io.make_unique()
 
-            tree = ast.parse(statement)
-
-            AssignmentFinder().visit(tree)
-#            for k,v in ast.iter_fields(tree['body']):
-#                print "{k}:{v}".format(**locals())
-
-        except SyntaxError:
-            print( "Parsing %s failed" % statement)
-
+        return (io.inputs, io.outputs)
+        
 
     def to_svg(self):
         ''' Writes SVG elements
@@ -178,11 +345,20 @@ class SVGdrawing(object):
         defines = ET.SubElement(svg_root, 'defs')
 
         defines.append(Transformation.defines())
+        defines.append(MemoryField.defines())
         drawing = ET.SubElement(svg_root, 'g', style="fill-opacity:1.0; stroke:black;")
 
+
+        min_coordinates = [0, 0]
         for child in self.children:
             for children in child.to_svg_elems():
                 drawing.append(children)
+                for node in children.findall(".//*[@x]"):
+                    min_coordinates[0] = min(int(round(float(node.get('x')))), min_coordinates[0])
+                    min_coordinates[1] = min(int(round(float(node.get('y')))), min_coordinates[1])
+
+        svg_root.set('width', str(abs(min_coordinates[0]) + self.width))
+        svg_root.set('height', str(abs(min_coordinates[1]) + self.height))
 
         return ET.tostring(svg_root)
 
@@ -211,7 +387,7 @@ def create_image(path):
         drawing.height = len(drawing.children) * offset + MemoryField.margin
         drawing.width = len(drawing.children[-1].fields) * (MemoryField.width + MemoryField.margin) + MemoryField.margin
 
-        with open(path+'.svg','w') as svgfile:
+        with open(path+'.svg','wb') as svgfile:
             svgfile.write(drawing.to_svg())
 
 
