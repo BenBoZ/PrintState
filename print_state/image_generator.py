@@ -110,7 +110,6 @@ class ProgramStateHeader(object):
 
         return group
 
-
 class IOFinder(ast.NodeVisitor):
 
     def __init__(self):
@@ -126,63 +125,52 @@ class IOFinder(ast.NodeVisitor):
         self.inputs = list(set(self.inputs))
         self.outputs = list(set(self.outputs))
 
-    def visit_comprehension(self, node):
-
+    def _visit_input(self, node):
         self._input_mode = True
-        self.visit(node.iter)
-        self.visit(node.ifs)
+        self.visit(node)
         self._input_mode = False
-        
+
+    def _visit_inputs(self, nodes):
+        for node in nodes:
+            if node:
+                self._visit_input(node)
+
+    def _visit_output(self, node):
         self._output_mode = True
-        self.visit(node.target)
-        self._output_mode = True
+        self.visit(node)
+        self._output_mode = False
+
+    def _visit_outputs(self, nodes):
+        for node in nodes:
+            self._visit_output(node)
+
+    def visit_comprehension(self, node):
+        self._visit_inputs([node.iter, node.ifs])
+        self._visit_output(node.target)
 
     def visit_Expr(self, node):
-
-        self._input_mode = True
-        self.generic_visit(node)
-        self._input_mode = False
+        with enabled(self._input_mode):
+            self.generic_visit(node)
 
     def visit_Assign(self, node):
-
-        self._output_mode = True
-
-        for target in node.targets:
-            self.visit(target)
-        self._output_mode = False
-
-        self._input_mode = True
-        self.visit(node.value)
-        self._input_mode = False
+        self._visit_outputs(node.targets)
+        self._visit_input(node.value)
 
     def visit_AugAssign(self, node):
-        self._output_mode = True
-
-        self.visit(node.target)
-        self._output_mode = False
-
-        self._input_mode = True
-        self.visit(node.value)
-        self._input_mode = False
+        self._visit_output(node.target)
+        self._visit_input(node.value)
 
     def visit_BinOp(self, node):
-        self._input_mode = True
-        self.visit(node.right)
-        self.visit(node.left)
-        self._input_mode = False
+        self._visit_input(node.right)
+        self._visit_input(node.left)
 
     def visit_UnaryOp(self, node):
-        self._input_mode = True
-        self.visit(node.operand)
-        self._input_mode = False
+        self._visit_input(node.operand)
 
     def visit_BoolOp(self, node):
-        self._input_mode = True
-        for value in node.values: self.visit(value)
-        self._input_mode = False
+        self._visit_inputs(node.values)
 
     def visit_Name(self, node):
-
         if self._input_mode and node.id not in ['True','False']:
             self.inputs += [node.id]
         if self._output_mode:
@@ -201,52 +189,30 @@ class IOFinder(ast.NodeVisitor):
         self._input_mode = old_input_mode
 
     def visit_Compare(self, node):
-
-        self._input_mode = True
-        for child in [node.left] + node.comparators:
-            self.visit(child)
-        self._input_mode = False
+        self._visit_inputs([node.left] + node.comparators)
 
     def visit_Call(self, node):
-
-        self._input_mode = True
-
-        for child in node.args + node.keywords + [node.starargs] + [node.kwargs]:
-            if child:
-                self.visit(child)
-        self._input_mode = False
+        self._visit_inputs(node.args + node.keywords)
 
     def _control_flow(self,node):
         self.outputs += ['line_number'] 
         self.generic_visit(node)
 
     def visit_If(self, node):
-
-        self._input_mode = True
-        self.visit(node.test)
-        self._input_mode= False
-        for child in node.orelse: self.visit(child)
+        self._visit_input(node.test)
+        self._visit_inputs(node.orelse)
         self.outputs += ['line_number'] 
 
     def visit_For(self, node):
+        self._visit_output(node.target)
+        self._visit_input(node.iter)
+        self._visit_inputs(node.orelse)
 
-        self._output_mode = True
-        self.visit(node.target)
-        self._output_mode = False
-
-        self._input_mode = True
-        self.visit(node.iter)
-        self._input_mode = False
-
-        for child in node.orelse: self.visit(child)
         self.outputs += ['line_number'] 
 
     def visit_While(self, node):
-        self._input_mode = True
-        self.visit(node.test)
-        self._input_mode = False
-
-        for child in node.orelse: self.visit(child)
+        self._visit_input(node.test)
+        self._visit_inputs(node.orelse)
         self.outputs += ['line_number'] 
 
     def visit_Break(self, node):
@@ -275,11 +241,7 @@ class ProgramState(object):
         self.pos = pos
         self.transformation = Transformation((pos[0] , pos[1] + MemoryField.height/2 * 1.1), statement)
         self.fields.append(MemoryField(pos[:], line_no))
-        print(line_no + ":" + statement)
         (inputs, outputs) = self.parse_statement(statement)
-
-        print("\tinputs: " + " ".join([str(name) for name in inputs]))
-        print("\toutputs: " + " ".join([str(name) for name in outputs]))
 
         for idx, (field_name, field_value) in enumerate(fields.items(), 1):
             mem_field = MemoryField((pos[0] + (MemoryField.margin + MemoryField.width) * idx, pos[1]), field_value)
