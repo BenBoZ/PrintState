@@ -76,7 +76,7 @@ class Transformation(object):
         y1, y2 = self.pos[1], self.pos[1]+self.height
 
         line_elem = ET.SubElement(group, 'path', **{'marker-end':'url(#arrowhead)',
-                                'stroke-width':'5',
+                                'stroke-width':'3',
                                 'fill':'none',
                                 'stroke':'black',
                                 'd':'M{x1},{y1} C{x2},{y1} {x2},{y2} {x3},{y2}'.format(**locals())})
