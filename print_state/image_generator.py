@@ -58,6 +58,8 @@ class MemoryField(object):
 class ProgramStateHeader(object):
 
 
+    fontsize = 10
+
     def __init__(self, pos, fields):
         self.fields = fields
         self.pos = pos
@@ -71,7 +73,7 @@ class ProgramStateHeader(object):
             y = self.pos[0] + (MemoryField.margin + 1 * MemoryField.width) * idx + MemoryField.width / 2
             x = self.pos[1] + 2* MemoryField.height
             text_elem = ET.SubElement(group, 'text', x=str(x), y=str(y),
-                                      style="font-family:monospace;font-size:10px;",
+                                      style="font-family:monospace;font-size:{size}px;".format(size=self.fontsize),
                                       transform="rotate(-90)")
             text_elem.text = field
 
@@ -272,6 +274,9 @@ class SVGdrawing(object):
     height= 500
     width = 500
 
+    x = 0
+    y = 0
+
     children = []
 
     def to_svg(self):
@@ -297,13 +302,17 @@ class SVGdrawing(object):
                     min_coordinates[0] = min(int(round(float(node.get('x')))), min_coordinates[0])
                     min_coordinates[1] = min(int(round(float(node.get('y')))), min_coordinates[1])
 
-        svg_root.set('width', str(abs(min_coordinates[0]) + self.width))
-        svg_root.set('height', str(abs(min_coordinates[1]) + self.height))
+        x_offset = abs(min_coordinates[0]) + 50
+        y_offset = abs(min_coordinates[1]) + 50
+
+        svg_root.set('width', str(x_offset + self.width))
+        svg_root.set('height', str(y_offset + self.height))
+
+        drawing.set('transform', "translate({x_offset} {y_offset})".format(**locals()))
 
         return ET.tostring(svg_root)
 
 class Arrow(object):
-
 
     arrowhead_define = ET.Element('marker', id='arrowhead',
                             orient='auto',
@@ -388,6 +397,9 @@ def create_image(path):
 
         drawing.height = len(drawing.children) * offset + MemoryField.margin
         drawing.width = len(drawing.children[-1].fields) * (MemoryField.width + MemoryField.margin) + MemoryField.margin
+
+        drawing.x = 1000
+        drawing.y = 1000
 
         with open(path+'.svg','wb') as svgfile:
             svgfile.write(drawing.to_svg())
