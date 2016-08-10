@@ -126,6 +126,10 @@ class IOFinder(ast.NodeVisitor):
         with enabled(self._input_mode):
             self.generic_visit(node)
 
+    def visit_Return(self, node):
+        self._visit_input(node.value)
+        self._visit_output(node.value)
+
     def visit_Assign(self, node):
         self._visit_outputs(node.targets)
         self._visit_input(node.value)
@@ -243,20 +247,22 @@ class ProgramState(object):
         arrow = Effect((x1,y1), (x2, y2))
         self.fields.append(arrow)
 
-    def parse_statement(self, statement):
+    def parse_statement(self, orig_statement):
 
         # See if it is valid python
         try:
-            if not code.compile_command(statement):
-                statement = statement + ' pass'
+            if code.compile_command(orig_statement):
+                statement = orig_statement
+            else:
+                statement = orig_statement + ' pass'
         except SyntaxError as e:
             try:
-                statement = 'if True: pass\n' + statement
+                statement = 'if True: pass\n' + orig_statement
                 if not code.compile_command(statement):
                     statement = statement + ' pass'
             except SyntaxError as e:
-                print( "Parsing %s failed" % statement)
-                statement = ""
+                #print( "Parsing %s failed" % statement)
+                statement = orig_statement
 
         tree = ast.parse(statement)
 
