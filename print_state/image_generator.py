@@ -169,25 +169,25 @@ class IOFinder(ast.NodeVisitor):
         self._visit_inputs(node.args + node.keywords)
 
     def _control_flow(self,node):
-        self.outputs += ['line_number'] 
+        self.outputs += ['line_number']
         self.generic_visit(node)
 
     def visit_If(self, node):
         self._visit_input(node.test)
         self._visit_inputs(node.orelse)
-        self.outputs += ['line_number'] 
+        self.outputs += ['line_number']
 
     def visit_For(self, node):
         self._visit_output(node.target)
         self._visit_input(node.iter)
         self._visit_inputs(node.orelse)
 
-        self.outputs += ['line_number'] 
+        self.outputs += ['line_number']
 
     def visit_While(self, node):
         self._visit_input(node.test)
         self._visit_inputs(node.orelse)
-        self.outputs += ['line_number'] 
+        self.outputs += ['line_number']
 
     def visit_Break(self, node):
         self._control_flow(node)
@@ -227,10 +227,21 @@ class ProgramState(object):
             if field_name in inputs:
                 mem_field.is_input = True
 
-        for input_field in inputs:
-            for output_field in outputs:
-                arrow = Effect((positions[input_field][0] + mem_field.width/2, positions[input_field][1] + mem_field.height), (positions[output_field][0] + mem_field.width/2, positions[output_field][1] +mem_field.height + 0.75 * ProgramState.margin))
-                self.fields.append(arrow)
+        for output_field in outputs:
+            input_field = None
+            for input_field in inputs:
+                self.add_arrow_from_field_to_field(input_field, output_field, mem_field, positions)
+            if not input_field:
+                self.add_arrow_from_field_to_field(output_field, output_field, mem_field, positions)
+
+    def add_arrow_from_field_to_field(self, from_name, to_name, mem_field, positions):
+
+        x1 = positions[from_name][0] + mem_field.width/2
+        y1 = positions[from_name][1] + mem_field.height
+        x2 = positions[to_name][0] + mem_field.width/2
+        y2 = positions[to_name][1] + mem_field.height + 0.75 * ProgramState.margin
+        arrow = Effect((x1,y1), (x2, y2))
+        self.fields.append(arrow)
 
     def parse_statement(self, statement):
 
@@ -246,15 +257,15 @@ class ProgramState(object):
             except SyntaxError as e:
                 print( "Parsing %s failed" % statement)
                 statement = ""
- 
+
         tree = ast.parse(statement)
- 
+
         io = IOFinder()
         io.visit(tree)
         io.make_unique()
 
         return (io.inputs, io.outputs)
-        
+
 
     def to_svg(self):
         ''' Writes SVG elements
@@ -401,7 +412,7 @@ def create_image(path):
 
             drawing.children += [ProgramState((MemoryField.margin, offset*idx + MemoryField.margin), row, line_no, statement)]
 
-                
+
 
         drawing.height = len(drawing.children) * offset + MemoryField.margin
         drawing.width = len(drawing.children[-1].fields) * (MemoryField.width + MemoryField.margin) + MemoryField.margin
