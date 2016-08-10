@@ -20,6 +20,11 @@ class MemoryField(object):
     _stop1 = ET.SubElement(grad_green, 'stop', offset="0%", style="stop-color:rgb(224,255,129);stop-opacity:1")
     _stop2 = ET.SubElement(grad_green, 'stop', offset="100%", style="stop-color:rgb(176,242,0);stop-opacity:1")
 
+    drop_shade_filter = ET.Element('filter', id='drop_shade_filter', x='0', y='0', width='200%', height='200%')
+    _dropshadeOffset  = ET.SubElement(drop_shade_filter, 'feOffset', result='offOut', **{'in':'SourceAlpha', 'dx':'3', 'dy':'3'})
+    _dropshadeBlur    = ET.SubElement(drop_shade_filter, 'feGaussianBlur', result='blurOut', **{'in':'offOut', 'stdDeviation':'5'})
+    _dropshadeBlend   = ET.SubElement(drop_shade_filter, 'feBlend', **{'in':'SourceGraphic', 'in2':'blurOut', 'mode':'normal'})
+
     def __init__(self, pos, text ):
         self.text = text
         self.pos = pos
@@ -27,7 +32,7 @@ class MemoryField(object):
 
     @classmethod
     def defines(cls):
-        return  cls.grad_green
+        return  [cls.grad_green, cls.drop_shade_filter]
 
     def to_svg(self):
         ''' Writes SVG element
@@ -47,7 +52,7 @@ class MemoryField(object):
 
         elem = ET.SubElement(group, 'rect', y=str(self.pos[1]), x=str(self.pos[0]),
                           width=str(self.width), height=str(self.height),
-                          style="fill:url(#grad_green)", stroke=color)
+                          style="fill:url(#grad_green)", filter='url(#drop_shade_filter)', stroke=color)
 
         text_elem = ET.SubElement(group, 'text', x=str(self.pos[0]+self.width/2), y=str(self.pos[1] + 5 + self.height/2),
                                   style="font-family:monospace;font-size:10px;text-anchor:middle;")
@@ -290,7 +295,10 @@ class SVGdrawing(object):
         defines = ET.SubElement(svg_root, 'defs')
 
         defines.append(Transformation.defines())
-        defines.append(MemoryField.defines())
+
+        for define in MemoryField.defines():
+            defines.append(define)
+
         drawing = ET.SubElement(svg_root, 'g', style="fill-opacity:1.0; stroke:black;")
 
 
