@@ -9,6 +9,8 @@ from copy import deepcopy
 def rgb_to_hex(rgb): return "#%x%x%x" % (rgb[0]/16,rgb[1]/16,rgb[2]/16)
 PURPLE="rgb(210,0,159)"
 GREEN="rgb(159,210,0)"
+LIGHTGRAY="rgb(202,202,202)"
+DARKGRAY="rgb(139,139,139)"
 
 class MemoryField(object):
 
@@ -19,6 +21,10 @@ class MemoryField(object):
     grad_green = ET.Element('linearGradient', id="grad_green", x1="0%", y1="0%", x2="0%", y2="100%")
     _stop1 = ET.SubElement(grad_green, 'stop', offset="0%", style="stop-color:rgb(224,255,129);stop-opacity:1")
     _stop2 = ET.SubElement(grad_green, 'stop', offset="100%", style="stop-color:rgb(176,242,0);stop-opacity:1")
+
+    grad_gray = ET.Element('linearGradient', id="grad_gray", x1="0%", y1="0%", x2="0%", y2="100%")
+    _stop1 = ET.SubElement(grad_gray, 'stop', offset="0%", style="stop-color:"+LIGHTGRAY+";stop-opacity:1")
+    _stop2 = ET.SubElement(grad_gray, 'stop', offset="100%", style="stop-color:"+DARKGRAY+";stop-opacity:1")
 
     drop_shade_filter = ET.Element('filter', id='drop_shade_filter', x='0', y='0', width='200%', height='200%')
     _dropshadeOffset  = ET.SubElement(drop_shade_filter, 'feOffset', result='offOut', **{'in':'SourceAlpha', 'dx':'3', 'dy':'3'})
@@ -32,7 +38,7 @@ class MemoryField(object):
 
     @classmethod
     def defines(cls):
-        return  [cls.grad_green, cls.drop_shade_filter]
+        return  [cls.grad_green, cls.grad_gray, cls.drop_shade_filter]
 
     def to_svg(self):
         ''' Writes SVG element
@@ -50,9 +56,16 @@ class MemoryField(object):
         else:
             color = GREEN
 
+        if self.text:
+            fill="fill:url(#grad_green)"
+        else:
+            self.text = "?"
+            fill="fill:url(#grad_gray)"
+            color=DARKGRAY
+
         elem = ET.SubElement(group, 'rect', y=str(self.pos[1]), x=str(self.pos[0]),
                           width=str(self.width), height=str(self.height),
-                          style="fill:url(#grad_green)", filter='url(#drop_shade_filter)', stroke=color)
+                          style=fill, filter='url(#drop_shade_filter)', stroke=color)
 
         text_elem = ET.SubElement(group, 'text', x=str(self.pos[0]+self.width/2), y=str(self.pos[1] + 5 + self.height/2),
                                   style="font-family:monospace;font-size:10px;text-anchor:middle;")
