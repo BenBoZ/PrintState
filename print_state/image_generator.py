@@ -9,6 +9,8 @@ from copy import deepcopy
 def rgb_to_hex(rgb): return "#%x%x%x" % (rgb[0]/16,rgb[1]/16,rgb[2]/16)
 PURPLE="rgb(210,0,159)"
 GREEN="rgb(159,210,0)"
+LIGHTGRAY="rgb(202,202,202)"
+DARKGRAY="rgb(139,139,139)"
 
 
 class MemoryField(object):
@@ -21,6 +23,15 @@ class MemoryField(object):
     _stop1 = ET.SubElement(grad_green, 'stop', offset="0%", style="stop-color:rgb(224,255,129);stop-opacity:1")
     _stop2 = ET.SubElement(grad_green, 'stop', offset="100%", style="stop-color:rgb(176,242,0);stop-opacity:1")
 
+    grad_gray = ET.Element('linearGradient', id="grad_gray", x1="0%", y1="0%", x2="0%", y2="100%")
+    _stop1 = ET.SubElement(grad_gray, 'stop', offset="0%", style="stop-color:"+LIGHTGRAY+";stop-opacity:1")
+    _stop2 = ET.SubElement(grad_gray, 'stop', offset="100%", style="stop-color:"+DARKGRAY+";stop-opacity:1")
+
+    drop_shade_filter = ET.Element('filter', id='drop_shade_filter', x='0', y='0', width='200%', height='200%')
+    _dropshadeOffset  = ET.SubElement(drop_shade_filter, 'feOffset', result='offOut', **{'in':'SourceAlpha', 'dx':'3', 'dy':'3'})
+    _dropshadeBlur    = ET.SubElement(drop_shade_filter, 'feGaussianBlur', result='blurOut', **{'in':'offOut', 'stdDeviation':'5'})
+    _dropshadeBlend   = ET.SubElement(drop_shade_filter, 'feBlend', **{'in':'SourceGraphic', 'in2':'blurOut', 'mode':'normal'})
+
     def __init__(self, pos, text ):
         self.text = text
         self.pos = pos
@@ -28,7 +39,7 @@ class MemoryField(object):
 
     @classmethod
     def defines(cls):
-        return  cls.grad_green
+        return  [cls.grad_green, cls.grad_gray, cls.drop_shade_filter]
 
     @classmethod
     def defines(cls):
@@ -50,9 +61,16 @@ class MemoryField(object):
         else:
             color = GREEN
 
+        if self.text:
+            fill="fill:url(#grad_green)"
+        else:
+            self.text = "?"
+            fill="fill:url(#grad_gray)"
+            color=DARKGRAY
+
         elem = ET.SubElement(group, 'rect', y=str(self.pos[1]), x=str(self.pos[0]),
                           width=str(self.width), height=str(self.height),
-                          style="fill:url(#grad_green)", stroke=color)
+                          style=fill, filter='url(#drop_shade_filter)', stroke=color)
 
         text_elem = ET.SubElement(group, 'text', x=str(self.pos[0]+self.width/2), y=str(self.pos[1] + 5 + self.height/2),
                                   style="font-family:monospace;font-size:10px;text-anchor:middle;")
@@ -62,6 +80,8 @@ class MemoryField(object):
 
 class ProgramStateHeader(object):
 
+
+    fontsize = 10
 
     def __init__(self, pos, fields):
         self.fields = fields
@@ -76,7 +96,7 @@ class ProgramStateHeader(object):
             y = self.pos[0] + (MemoryField.margin + 1 * MemoryField.width) * idx + MemoryField.width / 2
             x = self.pos[1] + 2* MemoryField.height
             text_elem = ET.SubElement(group, 'text', x=str(x), y=str(y),
-                                      style="font-family:monospace;font-size:10px;",
+                                      style="font-family:monospace;font-size:{size}px;".format(size=self.fontsize),
                                       transform="rotate(-90)")
             text_elem.text = field
 
@@ -124,6 +144,10 @@ class IOFinder(ast.NodeVisitor):
         with enabled(self._input_mode):
             self.generic_visit(node)
 
+    def visit_Return(self, node):
+        self._visit_input(node.value)
+        self._visit_output(node.value)
+
     def visit_Assign(self, node):
         self._visit_outputs(node.targets)
         self._visit_input(node.value)
@@ -167,25 +191,25 @@ class IOFinder(ast.NodeVisitor):
         self._visit_inputs(node.args + node.keywords)
 
     def _control_flow(self,node):
-        self.outputs += ['line_number'] 
+        self.outputs += ['line_number']
         self.generic_visit(node)
 
     def visit_If(self, node):
         self._visit_input(node.test)
         self._visit_inputs(node.orelse)
-        self.outputs += ['line_number'] 
+        self.outputs += ['line_number']
 
     def visit_For(self, node):
         self._visit_output(node.target)
         self._visit_input(node.iter)
         self._visit_inputs(node.orelse)
 
-        self.outputs += ['line_number'] 
+        self.outputs += ['line_number']
 
     def visit_While(self, node):
         self._visit_input(node.test)
         self._visit_inputs(node.orelse)
-        self.outputs += ['line_number'] 
+        self.outputs += ['line_number']
 
     def visit_Break(self, node):
         self._control_flow(node)
@@ -225,34 +249,47 @@ class ProgramState(object):
             if field_name in inputs:
                 mem_field.is_input = True
 
-        for input_field in inputs:
-            for output_field in outputs:
-                arrow = Effect((positions[input_field][0] + mem_field.width/2, positions[input_field][1] + mem_field.height), (positions[output_field][0] + mem_field.width/2, positions[output_field][1] +mem_field.height + 0.75 * ProgramState.margin))
-                self.fields.append(arrow)
+        for output_field in outputs:
+            input_field = None
+            for input_field in inputs:
+                self.add_arrow_from_field_to_field(input_field, output_field, mem_field, positions)
+            if not input_field:
+                self.add_arrow_from_field_to_field(output_field, output_field, mem_field, positions)
 
-    def parse_statement(self, statement):
+    def add_arrow_from_field_to_field(self, from_name, to_name, mem_field, positions):
+
+        x1 = positions[from_name][0] + mem_field.width/2
+        y1 = positions[from_name][1] + mem_field.height
+        x2 = positions[to_name][0] + mem_field.width/2
+        y2 = positions[to_name][1] + mem_field.height + 0.75 * ProgramState.margin
+        arrow = Effect((x1,y1), (x2, y2))
+        self.fields.append(arrow)
+
+    def parse_statement(self, orig_statement):
 
         # See if it is valid python
         try:
-            if not code.compile_command(statement):
-                statement = statement + ' pass'
+            if code.compile_command(orig_statement):
+                statement = orig_statement
+            else:
+                statement = orig_statement + ' pass'
         except SyntaxError as e:
             try:
-                statement = 'if True: pass\n' + statement
+                statement = 'if True: pass\n' + orig_statement
                 if not code.compile_command(statement):
                     statement = statement + ' pass'
             except SyntaxError as e:
-                print( "Parsing %s failed" % statement)
-                statement = ""
- 
+                #print( "Parsing %s failed" % statement)
+                statement = orig_statement
+
         tree = ast.parse(statement)
- 
+
         io = IOFinder()
         io.visit(tree)
         io.make_unique()
 
         return (io.inputs, io.outputs)
-        
+
 
     def to_svg(self):
         ''' Writes SVG elements
@@ -277,6 +314,9 @@ class SVGdrawing(object):
     height= 500
     width = 500
 
+    x = 0
+    y = 0
+
     children = []
 
     def to_svg(self):
@@ -290,7 +330,10 @@ class SVGdrawing(object):
         defines = ET.SubElement(svg_root, 'defs')
 
         defines.append(Transformation.defines())
-        defines.append(MemoryField.defines())
+
+        for define in MemoryField.defines():
+            defines.append(define)
+
         drawing = ET.SubElement(svg_root, 'g', style="fill-opacity:1.0; stroke:black;")
 
 
@@ -302,13 +345,17 @@ class SVGdrawing(object):
                     min_coordinates[0] = min(int(round(float(node.get('x')))), min_coordinates[0])
                     min_coordinates[1] = min(int(round(float(node.get('y')))), min_coordinates[1])
 
-        svg_root.set('width', str(abs(min_coordinates[0]) + self.width))
-        svg_root.set('height', str(abs(min_coordinates[1]) + self.height))
+        x_offset = abs(min_coordinates[0]) + 50
+        y_offset = abs(min_coordinates[1]) + 50
+
+        svg_root.set('width', str(x_offset + self.width))
+        svg_root.set('height', str(y_offset + self.height))
+
+        drawing.set('transform', "translate({x_offset} {y_offset})".format(**locals()))
 
         return ET.tostring(svg_root)
 
 class Arrow(object):
-
 
     arrowhead_define = ET.Element('marker', id='arrowhead',
                             orient='auto',
@@ -389,10 +436,13 @@ def create_image(path):
 
             drawing.children += [ProgramState((MemoryField.margin, offset*idx + MemoryField.margin), row, line_no, statement)]
 
-                
+
 
         drawing.height = len(drawing.children) * offset + MemoryField.margin
         drawing.width = len(drawing.children[-1].fields) * (MemoryField.width + MemoryField.margin) + MemoryField.margin
+
+        drawing.x = 1000
+        drawing.y = 1000
 
         with open(path+'.svg','wb') as svgfile:
             svgfile.write(drawing.to_svg())
