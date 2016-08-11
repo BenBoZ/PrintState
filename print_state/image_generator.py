@@ -41,10 +41,6 @@ class MemoryField(object):
     def defines(cls):
         return  [cls.grad_green, cls.grad_gray, cls.drop_shade_filter]
 
-    @classmethod
-    def defines(cls):
-        return  cls.grad_green
-
     def to_svg(self):
         ''' Writes SVG element
         >>> MemoryField(pos=(25,50), text='bla').to_svg()
