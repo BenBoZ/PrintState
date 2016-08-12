@@ -150,6 +150,8 @@ class IOFinder(ast.NodeVisitor):
 
     def visit_AugAssign(self, node):
         self._visit_output(node.target)
+        # a *= b means a is both in as output
+        self._visit_input(node.target)
         self._visit_input(node.value)
 
     def visit_BinOp(self, node):
