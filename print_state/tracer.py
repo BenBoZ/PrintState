@@ -3,7 +3,7 @@
 import sys
 import linecache
 from types import ModuleType, FunctionType
-import csv
+import json
 from copy import deepcopy
 
 __tracements__ = []
@@ -27,7 +27,7 @@ def traceit(frame, event, arg):
 
         global __tracements__
         line_dict = dict(line_globals)
-        for d in [line_locals, {'lineno':lineno, 'line':line}]:
+        for d in [line_locals, {'lineno':lineno, 'line':line, '__frame_id__':id(frame), '__name__':frame.f_code.co_name}]:
             line_dict.update(d)
 
         __tracements__ += [deepcopy(line_dict)]
@@ -47,14 +47,13 @@ def trace_me(tracefile='tracefile', image=True):
             result = func(*args, **kwargs)
             sys.settrace(None)
 
-            with open(tracefile, 'w') as output:
+            with open(tracefile, 'a') as output:
 
-                writer = csv.DictWriter(output, fieldnames=__tracements__[-1].keys())
-                writer.writeheader()
-                for tracement in __tracements__:
-                    writer.writerow(tracement)
-
-            __tracements__ = []
+                while __tracements__:
+                    tracement = __tracements__.pop(0)
+                    if tracement['__name__'] != 'wrapped':
+                        json.dump(tracement, output)
+                        output.write(',\n')
 
             return result
         return wrapped
