@@ -9,8 +9,11 @@ from copy import deepcopy
 def rgb_to_hex(rgb): return "#%x%x%x" % (rgb[0]/16,rgb[1]/16,rgb[2]/16)
 PURPLE="rgb(210,0,159)"
 GREEN="rgb(159,210,0)"
+BLUE="rgb(48,149,180)"
+ORANGE="rgb(240,170,0)"
 LIGHTGRAY="rgb(202,202,202)"
 DARKGRAY="rgb(139,139,139)"
+DARKESTGRAY="rgb(89,89,89)"
 
 
 class MemoryField(object):
