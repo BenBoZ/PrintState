@@ -72,7 +72,7 @@ class MemoryField(object):
                           style=fill, filter='url(#drop_shade_filter)', stroke=color)
 
         text_elem = ET.SubElement(group, 'text', x=str(self.pos[0]+self.width/2), y=str(self.pos[1] + 5 + self.height/2),
-                                  style="font-family:monospace;font-size:10px;text-anchor:middle;")
+                                  style="font-family:monospace;font-size:10px;text-anchor:middle;", stroke=DARKESTGRAY)
         text_elem.text = self.text
         return group
 
@@ -96,6 +96,7 @@ class ProgramStateHeader(object):
             x = self.pos[1] + 2* MemoryField.height
             text_elem = ET.SubElement(group, 'text', x=str(x), y=str(y),
                                       style="font-family:monospace;font-size:{size}px;".format(size=self.fontsize),
+                                      stroke=DARKESTGRAY,
                                       transform="rotate(-90)")
             text_elem.text = field
 
@@ -363,7 +364,7 @@ class Arrow(object):
                             markerWidth='1',
                             markerHeight='2',
                             refX='0.1', refY='2')
-    arrowhead_shape = ET.SubElement(arrowhead_define, 'path', d='M0,0 V4 L2,2 Z', fill='black')
+    arrowhead_shape = ET.SubElement(arrowhead_define, 'path', d='M0,0 V4 L2,2 Z', fill=DARKESTGRAY)
 
     @classmethod
     def defines(cls):
@@ -389,12 +390,12 @@ class Transformation(Arrow):
         line_elem = ET.SubElement(group, 'path', **{'marker-end':'url(#arrowhead)',
                                 'stroke-width':'3',
                                 'fill':'none',
-                                'stroke':'black',
+                                'stroke':BLUE,
                                 'd':'M{x1},{y1} C{x2},{y1} {x2},{y2} {x3},{y2}'.format(**locals())})
 
         width_of_text = len(self.statement) * 6
         text_elem = ET.SubElement(group, 'text', x=str(x2-width_of_text), y=str(y1 + self.height/2),
-                                  style="font-family:monospace;font-size:10px;")
+                                  style="font-family:monospace;font-size:10px;", stroke=DARKESTGRAY)
         text_elem.text = self.statement
 
         return group
